@@ -57,9 +57,10 @@ public:
   uint8_t getHeight(void); //returns _height
   void sendColors(void); //sends all data in buffer. function is blocking and does not allow any interruption (interrupts are disabled)
  uint8_t* _colorarray; //array that contains pixel information that can be directly sent out to led matrix without conversion
+ void  clear(void); //clear all pixels
 void  setByte(uint8_t index,  uint8_t data); //write data directly in buffer
 uint8_t  getByte(uint8_t index);
-  RGB HSVtoRGB(uint8_t H, uint8_t S, uint8_t V); 
+   RGB HSVtoRGB(float H, float S, float V);
 private:
   void sendByte(uint8_t data); //helper function to decode a byte and clock it out
   uint8_t _width; //width of matrix (number of columns)

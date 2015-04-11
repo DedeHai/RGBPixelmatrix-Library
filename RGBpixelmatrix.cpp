@@ -42,9 +42,9 @@
 
  RGBpixelmatrix::RGBpixelmatrix(uint8_t width, uint8_t height)
 {
-  _width = width*3; //each pixel has 3 bytes (24bits per pixel)representing it this way makes calculations faster in the code
+  _width = width; //each pixel has 3 bytes (24bits per pixel)representing it this way makes calculations faster in the code
   //as this multiplication would have to be done for each read or write to a pixel
-  _height = height; //height (=number of lines)
+  _height = height*3; //height (=number of lines)
   
   //get memory reserved for our array using malloc()
   void * newarray = malloc ((uint16_t)_width*_height);
@@ -68,75 +68,88 @@ RGBpixelmatrix::~RGBpixelmatrix()
  The array containing the pixel information is meant to be sent out directly (shift out) without
  the need to re-organize pixels to make it as fast as possible during send.
  Assumptions:
- -input of pixels is on top left of the panel 
- -The input connects to pixel 0/0 (=4th quadrant of cartesian coordinate system)
- -The first elements of the array represent this pixel. It is therefore sent out  with decrementing index
+ -input of pixels is on bottom left of matrix
+ -The input connects to pixel 0/0 (=1st quadrant of cartesian coordinate system)
+ -The first elements of the array represent this pixel. It is therefore sent out first
+ -The strips are the columns, first strip on the left starts from bottom and goes to top, second one 
+  from top and goes to bottom, like a meandering snake.
  
  The pixels (WS2811) work this way: pixel receives three bytes. After filling the buffer it connects
  the input to the output. The first pixel sent out is 0/0. it is not a shift register like operation!
  
- Each pixel wants the data in GRB not RGB (error in datasheet?), so data is stored that way.
- Also the orientation changes after each line. All even lines are forward represented, all uneven lines
- are reversed. Only pixels are reversed, each pixel still is in GRB.
+ Each pixel wants the data in GRB not RGB, so data is stored that way.
+ Also the orientation changes after each column. All even column are forward represented, all uneven columns
+ are reversed. Only pixels order is reversed, each pixel still is in GRB.
  example:
- Actual Matrix          Array (each cell is in GRB)
- 0|1|2|3 -> line 0          0|1|2|3 ... 3|2|1|0 ... 0|1|2|3
- 0|1|2|3 -> line 1          (line 1)    (line 2)    (line 3)
- 0|1|2|3 -> line 2
+ Actual Matrix        Array (each cell is in GRB)
+ 
+ 2|3|8|9 -> line 2          
+ 1|4|4|10 -> line 1         
+ 0|5|6|11 -> line 0
+ 
+ c
+ o
+ l
+ u
+ m
+ n
+ 0
  
  now the array would be sent out starting from index 0 (first pixel). example is a 4x3 matrix, hence 12*3 bytes
- for the array. sending will be from 0...35 sending pixel0/0, pixel1/0, pixel2/0, pixel3/0,pixel0/1 and so on
+ for the array. sending will be from 0...35 sending pixel0, pixel1, pixel2, pixel3,pixel4 and so on
  */
 
 
-RGB RGBpixelmatrix::getColor( uint8_t column,  uint8_t line) //get pixel color in RGB 
+RGB RGBpixelmatrix::getColor(uint8_t column,  uint8_t line) //get pixel color in RGB 
 {
-  uint16_t lineindex = line*_width; //index of first pixel at this line (not reversed!)
-  uint8_t columnoffset;
+  uint16_t columnindex = column*_height; //index of first pixel at this column (not reversed!)
+  uint8_t lineoffset;
   RGB returncolor;
   
-  if(line%2) //uneven lines are pixel-reversed, color order is BRG
+  if(column%2) //uneven columns are pixel-reversed, color order is BRG
   {
-    columnoffset = _width-column*3-3; //offset from first pixel in this line (each pixel has 24bit!) this line is reversed
+    lineoffset = _height-line*3-3; //offset from first pixel in this column (each pixel has 24bit!) this column is reversed
   }
-  else //even lines are not pixel-reversed, color order is BRG
+  else //even columns are not pixel-reversed, color order is BRG
   {
-   columnoffset = column*3; //offset from first pixel in this line (each pixel has 24bit!)
+   lineoffset = line*3; //offset from first pixel in this column (each pixel has 24bit!)
   }
   
-  returncolor.g = _colorarray[lineindex+columnoffset];    
-  returncolor.r = _colorarray[lineindex+columnoffset+1];
-  returncolor.b = _colorarray[lineindex+columnoffset+2];
+  returncolor.g = _colorarray[columnindex+lineoffset];    
+  returncolor.r = _colorarray[columnindex+lineoffset+1];
+  returncolor.b = _colorarray[columnindex+lineoffset+2];
   return returncolor;
 }
 
 
-  uint8_t RGBpixelmatrix::getWidth(void) //returns _width
+  uint8_t RGBpixelmatrix::getWidth(void) //returns width
   {
-  return _width;
+  return _width/3;
   }
   
-  uint8_t RGBpixelmatrix::getHeight(void) //returns _height
+  uint8_t RGBpixelmatrix::getHeight(void) //returns height
   {
   return _height;
   }
 
 void  RGBpixelmatrix::setColor(uint8_t column,  uint8_t line, RGB color) //set pixel color in RGB
 {
+  uint16_t columnindex = column*_height; //index of first pixel at this column (not reversed!)
+  uint8_t lineoffset = line*3;
 
- uint16_t lineindex = _width * line; //index of first pixel at this line (not reversed!)
- uint8_t columnoffset = column*3;
-
-  if(line%2) //uneven lines are  pixel-reversed, color order is GRB
+  if(column%2) //uneven lines are  pixel-reversed, color order is GRB
   {
-    columnoffset = _width-columnoffset-3; //offset from first pixel in this line (each pixel has 24bit!) this line is reversed
+    lineoffset = _height-lineoffset-3; //offset from first pixel in this line (each pixel has 24bit!) this line is reversed
   }
 
-  _colorarray[lineindex+columnoffset]   = color.g;    
-  _colorarray[lineindex+columnoffset+1] = color.r;
-  _colorarray[lineindex+columnoffset+2] = color.b;
+  _colorarray[columnindex+lineoffset]   = color.g;    
+  _colorarray[columnindex+lineoffset+1] = color.r;
+  _colorarray[columnindex+lineoffset+2] = color.b;
+}
 
-
+void  RGBpixelmatrix::clear(void) //clear all pixels
+{
+	memset(_colorarray, 0, _width*_height);
 }
 
 void  RGBpixelmatrix::setByte(uint8_t index,  uint8_t data) //write data directly in buffer
@@ -155,7 +168,7 @@ uint8_t  RGBpixelmatrix::getByte(uint8_t index) //returns data directly from buf
 
 }
 
- RGB RGBpixelmatrix::HSVtoRGB(uint8_t H, uint8_t S, uint8_t V)
+ RGB RGBpixelmatrix::HSVtoRGB(float H, float S, float V)
  {
  
   float s=(float)S/255.0; //auf 1 normieren
@@ -239,6 +252,14 @@ inline void RGBpixelmatrix::sendByte(uint8_t data)
       asm volatile ("nop");
       asm volatile ("nop");
       asm volatile ("nop");
+	    asm volatile ("nop");
+		 asm volatile ("nop");
+		  asm volatile ("nop");
+		      asm volatile ("nop");
+    asm volatile ("nop");
+		 asm volatile ("nop");
+		  asm volatile ("nop");
+		      asm volatile ("nop");
       PORTD &= 0b01111111; //pin7 low
 
     }
@@ -246,6 +267,11 @@ inline void RGBpixelmatrix::sendByte(uint8_t data)
     {
       PORTD |= 0b10000000; //pin7 high
       asm volatile ("nop");
+	  asm volatile ("nop");
+	   asm volatile ("nop");
+	       asm volatile ("nop");
+		 asm volatile ("nop");
+		  
       PORTD &= 0b01111111; //pin7 low
 
     }
